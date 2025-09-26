@@ -1,0 +1,18 @@
+$ORIGIN celestial.se.
+$TTL 300
+@ SOA ns1.loopia.se. registry.loopia.se. (
+                                1758828481
+                                3H  ; Refresh after three hours
+                                1H  ; Retry after one hour
+                                1W  ; Expire after one week
+                                1D )    ; Minimum one day TTL
+
+@                               IN      3600    NS      ns1.loopia.se.
+@                               IN      3600    NS      ns2.loopia.se.
+
+@                               IN      3600    A       46.101.221.97
+
+*                               IN      3600    A       46.101.221.97
+
+www                             IN      3600    A       46.101.221.97
+

@@ -3,8 +3,16 @@ import configparser
 import urllib.parse
 import requests
 import stripe
+import logging
 
 app = Flask(__name__)
+
+# Lägg till loggning till fil
+logging.basicConfig(
+    filename='/home/yourusername/tink_app/app.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s'
+)
 
 # Läs konfigurationsvärden från config.ini
 config = configparser.ConfigParser()
@@ -20,6 +28,7 @@ stripe.api_key = STRIPE_SECRET_KEY
 # --- TINK DEL ---
 @app.route('/')
 def index():
+    logging.info(">>> Användare besöker startsidan")
     html = '''
     <h1>Välkommen till Onboarding-appen</h1>
     <p><a href="/start-business-check">Testa Tink (Bankdata)</a></p>
@@ -30,6 +39,7 @@ def index():
 
 @app.route('/start-business-check')
 def start_business_check():
+    logging.info(">>> Användare startar Tink Business Check")
     market = request.args.get('market', 'DE')
     locale = request.args.get('locale', 'sv_SE')
     redirect_uri = 'https://celestial.se/callback'
@@ -48,17 +58,17 @@ def start_business_check():
 
 @app.route('/callback')
 def callback():
-    print(">>> Callback mottagen från Tink!")
+    logging.info(">>> Callback mottagen från Tink!")
     auth_code = request.args.get('code')
     error = request.args.get('error')
-    print(f">>> Query parameters - auth_code: {auth_code}, error: {error}")
+    logging.info(f">>> Query parameters - auth_code: {auth_code}, error: {error}")
 
     if error:
-        print(f">>> Fel vid Tink-autentisering: {error}")
+        logging.info(f">>> Fel vid Tink-autentisering: {error}")
         return f'Fel vid Tink-autentisering: {error}'
 
     if auth_code:
-        print(">>> Auth code mottagen, försöker byta till access token...")
+        logging.info(">>> Auth code mottagen, försöker byta till access token...")
         token_url = 'https://api.tink.com/api/v1/oauth/token'
         payload = {
             'client_id': CLIENT_ID,
@@ -69,26 +79,27 @@ def callback():
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
         response = requests.post(token_url, data=payload, headers=headers)
-        print(f">>> Token endpoint svarade med status: {response.status_code}")
+        logging.info(f">>> Token endpoint svarade med status: {response.status_code}")
         if response.status_code == 200:
             token_data = response.json()
             access_token = token_data.get('access_token')
             refresh_token = token_data.get('refresh_token')
-            print(f">>> Access token mottagen: {access_token}")
-            print(f">>> Refresh token mottagen: {refresh_token}")
+            logging.info(f">>> Access token mottagen: {access_token}")
+            logging.info(f">>> Refresh token mottagen: {refresh_token}")
             return (f'Access token mottagen: {access_token}<br>'
                     f'Refresh token: {refresh_token}')
         else:
-            print(f">>> Fel vid token-utbyte: {response.status_code}, {response.text}")
+            logging.info(f">>> Fel vid token-utbyte: {response.status_code}, {response.text}")
             return f'Fel vid token-utbyte: {response.status_code}, {response.text}'
 
-    print(">>> Callback mottagen utan auth code eller fel.")
+    logging.info(">>> Callback mottagen utan auth code eller fel.")
     return 'Callback mottagen utan auth code eller fel.'
 
 # --- STRIPE DEL ---
 
 @app.route('/pay-3-kr')
 def pay_3_kr():
+    logging.info(">>> Användare besöker /pay-3-kr")
     return render_template_string('''
     <h2>Testa betalning (3 kr)</h2>
     <button id="pay-button">Betala 3 kr</button>
@@ -119,17 +130,21 @@ def pay_3_kr():
 
 @app.route('/create-payment-intent', methods=['POST'])
 def create_payment_intent():
+    logging.info(">>> Skapar betalningsintent för 3 kr")
     try:
         intent = stripe.PaymentIntent.create(
             amount=300,  # 300 öre = 3 kr
             currency='sek',
         )
+        logging.info(f">>> Payment intent skapad: {intent['id']}")
         return jsonify({'client_secret': intent['client_secret']})
     except Exception as e:
+        logging.error(f">>> Fel vid skapande av payment intent: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @app.route('/subscribe')
 def subscribe():
+    logging.info(">>> Användare besöker /subscribe")
     return render_template_string('''
     <h2>Teckna prenumeration (40 kr/mån)</h2>
     <button id="subscribe-button">Teckna prenumeration</button>
@@ -154,6 +169,7 @@ def subscribe():
 
 @app.route('/create-checkout-session', methods=['POST'])
 def create_checkout_session():
+    logging.info(">>> Skapar checkout session för prenumeration")
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -171,16 +187,20 @@ def create_checkout_session():
             success_url='https://celestial.se/success',
             cancel_url='https://celestial.se/cancel',
         )
+        logging.info(f">>> Checkout session skapad: {session['id']}")
         return jsonify({'id': session.id})
     except Exception as e:
+        logging.error(f">>> Fel vid skapande av checkout session: {str(e)}")
         return jsonify({'error': str(e)}), 400
 
 @app.route('/success')
 def success():
+    logging.info(">>> Användare kom till /success")
     return '<h2>Tack för din prenumeration!</h2>'
 
 @app.route('/cancel')
 def cancel():
+    logging.info(">>> Användare kom till /cancel")
     return '<h2>Prenumeration avbruten.</h2>'
 
 if __name__ == '__main__':

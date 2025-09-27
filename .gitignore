@@ -1,0 +1,20 @@
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+__pycache__/
+*.pyc
+.venv/
+venv/
+config.ini
+.DS_Store
+.vscode/
+# Undanta specifika filer
+kommandon.txt
+lösenord.txt
+passwords.txt
+celestial-se.txt

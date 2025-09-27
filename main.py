@@ -108,6 +108,7 @@ def pay_3_kr():
       </div>
       <button id="submit-button">Betala 3 kr</button>
     </form>
+    <div id="payment-errors" style="color: red;"></div>  <!-- Visa felmeddelanden här -->
     <script src="https://js.stripe.com/v3/"></script>
     <script>
       var stripe = Stripe('{{public_key}}');
@@ -128,9 +129,10 @@ def pay_3_kr():
           card: cardElement,
         }).then(function(result) {
           if (result.error) {
-            alert(result.error.message);
+            // Visa felmeddelande om något gick fel
+            document.getElementById('payment-errors').textContent = result.error.message;
           } else {
-            // Send PaymentMethod ID to your server
+            // Skicka PaymentMethod ID till servern
             fetch('/create-payment-intent', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
@@ -143,9 +145,12 @@ def pay_3_kr():
             })
             .then(function(data) {
               if (data.error) {
-                alert(data.error);
+                // Visa felmeddelande snyggt (t.ex. i ett div-element)
+                document.getElementById('payment-errors').textContent = data.error;
               } else {
-                alert('Betalning genomförd! Status: ' + data.status);
+                // Visa success-meddelande eller skicka användaren vidare
+                document.getElementById('payment-form').innerHTML = '<h3>' + data.message + '</h3>';
+                window.location.href = data.redirect_url;  // <-- Skicka till success-sida
               }
             });
           }
@@ -159,22 +164,35 @@ def create_payment_intent():
     logging.info(">>> Skapar betalningsintent för 3 kr")
     try:
         data = request.json
-        payment_method_id = data.get('payment_method_id')
+        payment_method_id = data.get('payment_method_id')  # <-- Från frontend
 
+        # Skapa en PaymentIntent och bekräfta direkt
         intent = stripe.PaymentIntent.create(
-            amount=300,  # 300 öre = 3 kr
-            currency='sek',
-            payment_method=payment_method_id,  # <-- Använd det från frontend
-            confirm=True  # <-- Bekräfta direkt
-        )
+          amount=300,  # 3 kr
+          currency='sek',
+          payment_method=payment_method_id,
+          confirm=True,
+          automatic_payment_methods={
+              'enabled': True,
+              'allow_redirects': 'never'  # <-- Undvik omdirigeringar
+          }
+      )
         logging.info(f">>> Payment intent skapad: {intent['id']}")
         return jsonify({
-            'status': intent['status'],
-            'id': intent['id']
+            'status': intent['status'],  # T.ex. "succeeded"
+            'id': intent['id']  # T.ex. "pi_xxx"
         })
     except Exception as e:
         logging.error(f">>> Fel vid skapande av payment intent: {str(e)}")
         return jsonify({'error': str(e)}), 400
+    
+@app.route('/success')
+def success():
+    return '''
+    <h2>Betalningen är genomförd!</h2>
+    <p>Tack för din betalning. Du kan nu fortsätta använda tjänsten.</p>
+    <a href="/">Gå till startsidan</a>
+    '''
 
 @app.route('/subscribe')
 def subscribe():

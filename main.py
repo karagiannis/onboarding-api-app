@@ -102,27 +102,53 @@ def pay_3_kr():
     logging.info(">>> Användare besöker /pay-3-kr")
     return render_template_string('''
     <h2>Testa betalning (3 kr)</h2>
-    <button id="pay-button">Betala 3 kr</button>
+    <form id="payment-form">
+      <div id="card-element">
+        <!-- Stripe Elements will create form elements here -->
+      </div>
+      <button id="submit-button">Betala 3 kr</button>
+    </form>
     <script src="https://js.stripe.com/v3/"></script>
     <script>
       var stripe = Stripe('{{public_key}}');
-      var button = document.getElementById('pay-button');
-      button.addEventListener('click', function() {
-        fetch('/create-payment-intent', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-        })
-        .then(function(response) {
-          return response.json();
-        })
-        .then(function(data) {
-          stripe.confirmCardPayment(data.client_secret).then(function(result) {
-            if (result.error) {
-              alert(result.error.message);
-            } else {
-              alert('Betalning genomförd!');
-            }
-          });
+      var elements = stripe.elements();
+
+      // Create a CardElement
+      var cardElement = elements.create('card');
+      cardElement.mount('#card-element');
+
+      // Handle form submission
+      var form = document.getElementById('payment-form');
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        // Create a PaymentMethod
+        stripe.createPaymentMethod({
+          type: 'card',
+          card: cardElement,
+        }).then(function(result) {
+          if (result.error) {
+            alert(result.error.message);
+          } else {
+            // Send PaymentMethod ID to your server
+            fetch('/create-payment-intent', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                payment_method_id: result.paymentMethod.id
+              })
+            })
+            .then(function(response) {
+              return response.json();
+            })
+            .then(function(data) {
+              if (data.error) {
+                alert(data.error);
+              } else {
+                alert('Betalning genomförd! Status: ' + data.status);
+              }
+            });
+          }
         });
       });
     </script>
@@ -132,12 +158,20 @@ def pay_3_kr():
 def create_payment_intent():
     logging.info(">>> Skapar betalningsintent för 3 kr")
     try:
+        data = request.json
+        payment_method_id = data.get('payment_method_id')
+
         intent = stripe.PaymentIntent.create(
             amount=300,  # 300 öre = 3 kr
             currency='sek',
+            payment_method=payment_method_id,  # <-- Använd det från frontend
+            confirm=True  # <-- Bekräfta direkt
         )
         logging.info(f">>> Payment intent skapad: {intent['id']}")
-        return jsonify({'client_secret': intent['client_secret']})
+        return jsonify({
+            'status': intent['status'],
+            'id': intent['id']
+        })
     except Exception as e:
         logging.error(f">>> Fel vid skapande av payment intent: {str(e)}")
         return jsonify({'error': str(e)}), 400

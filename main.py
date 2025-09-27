@@ -164,30 +164,48 @@ def create_payment_intent():
     logging.info(">>> Skapar betalningsintent för 3 kr")
     try:
         data = request.json
-        payment_method_id = data.get('payment_method_id')  # <-- Från frontend
+        payment_method_id = data.get('payment_method_id')
 
-        # Skapa en PaymentIntent och bekräfta direkt
         intent = stripe.PaymentIntent.create(
-          amount=300,  # 3 kr
-          currency='sek',
-          payment_method=payment_method_id,
-          confirm=True,
-          automatic_payment_methods={
-              'enabled': True,
-              'allow_redirects': 'never'  # <-- Undvik omdirigeringar
-          }
-      )
+            amount=300,  # 3 kr
+            currency='sek',
+            payment_method=payment_method_id,
+            confirm=True,
+            automatic_payment_methods={
+                'enabled': True,
+                'allow_redirects': 'never'  # <-- Undvik omdirigeringar
+            }
+        )
         logging.info(f">>> Payment intent skapad: {intent['id']}")
         return jsonify({
-            'status': intent['status'],  # T.ex. "succeeded"
-            'id': intent['id']  # T.ex. "pi_xxx"
+            'status': intent['status'],
+            'message': 'Betalning genomförd!',
+            'redirect_url': '/payment-success'  # <-- Uppdatera till rätt route
         })
+
+    except stripe.error.CardError as e:
+        # Fel från kortet (t.ex. utgånget, fel CVC)
+        logging.error(f">>> Kortfel: {str(e)}")
+        return jsonify({
+            'error': e.user_message or 'Ett fel uppstod med kortet.'
+        }), 400
+
+    except stripe.error.InvalidRequestError as e:
+        # Felaktig begäran (t.ex. fel belopp, fel format)
+        logging.error(f">>> Ogiltig begäran: {str(e)}")
+        return jsonify({
+            'error': 'Ogiltig begäran.'
+        }), 400
+
     except Exception as e:
-        logging.error(f">>> Fel vid skapande av payment intent: {str(e)}")
-        return jsonify({'error': str(e)}), 400
+        # Övriga fel
+        logging.error(f">>> Okänt fel: {str(e)}")
+        return jsonify({
+            'error': 'Ett okänt fel uppstod.'
+        }), 500
     
-@app.route('/success')
-def success():
+@app.route('/payment-success')
+def payment_success():
     return '''
     <h2>Betalningen är genomförd!</h2>
     <p>Tack för din betalning. Du kan nu fortsätta använda tjänsten.</p>

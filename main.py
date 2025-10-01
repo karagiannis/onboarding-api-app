@@ -274,4 +274,5 @@ def cancel():
     return '<h2>Prenumeration avbruten.</h2>'
 
 if __name__ == '__main__':
-    app.run(debug=True, port=3000)
+    # Viktigt: Lägg till host='0.0.0.0' för att göra den tillgänglig externt via Nginx
+    app.run(debug=True, port=8000, host='0.0.0.0')
